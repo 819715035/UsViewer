@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="ic_close" type="drawable">@drawable/ic_close_dr</item>
+    <item name="ic_ellipse" type="drawable">@drawable/ic_ellipse_dr</item>
+    <item name="ic_measure_distance" type="drawable">@drawable/ic_measure_distance_dr</item>
+</resources>

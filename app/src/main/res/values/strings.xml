@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">UsViewer</string>
+    <string name="freeze">Freeze</string>
+    <string name="live">Live</string>
+    <string name="fit_width">Fit Width</string>
+    <string name="fit_height">Fit Height</string>
+    <string name="annotate">Annotate</string>
+    <string name="ask_permission_again">Ask permission again</string>
+    <string name="permission_wr_missing">Read/Write permission missing. Try again to save image</string>
+    <string name="image_saved">Image saved to %s</string>
+    <string name="clearAll">Clear All</string>
+    <string name="ellipse">Ellipse</string>
+    <string name="distance">Distance</string>
+</resources>
