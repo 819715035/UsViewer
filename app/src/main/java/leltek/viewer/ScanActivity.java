@@ -1057,7 +1057,7 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onScanStarted() {
         mToggleScan.setText(R.string.freeze);
-        rytLoops.setVisibility(View.GONE);
+        rytLoops.setVisibility(View.INVISIBLE);
         ToastMgr.show("Scan Started");
     }
 
