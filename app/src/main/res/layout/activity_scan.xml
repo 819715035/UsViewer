@@ -433,63 +433,63 @@
 
         </LinearLayout>
 
-        <FrameLayout
-            android:id="@+id/capturedArea"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.05">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <leltek.viewer.UsImageView
-                    android:id="@+id/image_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="@android:color/black"
-                    android:scaleType="matrix" />
-
-                <RelativeLayout
-                    android:id="@+id/rytLoops"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:visibility="gone">
-
-                    <SeekBar
-                        android:id="@+id/seekBarLoops"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_toLeftOf="@+id/txvFrameNo"
-                        android:maxHeight="2dp"
-                        android:minHeight="4dp"
-                        android:paddingLeft="12dp"
-                        android:paddingRight="12dp"
-                        android:layout_marginBottom="20dp"
-                        android:layout_centerVertical="true"
-                        android:max="49"/>
-
-                    <TextView
-                        android:id="@+id/txvFrameNo"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentRight="true"
-                        android:gravity="left"
-                        android:padding="12dp"
-                        android:text="frame# 0"
-                        android:textSize="16dp"
-                        android:visibility="gone"/>
-                </RelativeLayout>
-
-            </LinearLayout>
+            android:layout_weight="1.05"
+            android:orientation="vertical">
 
             <FrameLayout
-                android:id="@+id/annotateContainer"
+                android:id="@+id/capturedArea"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-        </FrameLayout>
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                    <leltek.viewer.UsImageView
+                        android:id="@+id/image_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@android:color/black"
+                        android:scaleType="matrix" />
+
+                <FrameLayout
+                    android:id="@+id/annotateContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </FrameLayout>
+
+            <RelativeLayout
+                android:id="@+id/rytLoops"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <SeekBar
+                    android:id="@+id/seekBarLoops"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_toLeftOf="@+id/txvFrameNo"
+                    android:maxHeight="2dp"
+                    android:minHeight="4dp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:layout_marginBottom="20dp"
+                    android:layout_centerVertical="true"
+                    android:max="49"/>
+
+                <TextView
+                    android:id="@+id/txvFrameNo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:gravity="left"
+                    android:padding="12dp"
+                    android:text="frame# 0"
+                    android:textSize="16dp"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="0dp"
