@@ -49,6 +49,7 @@ public class SavedExamActivity extends AppCompatActivity implements View.OnClick
     private SavedExamAdapter adapter;
     private ImageView imgMenu;
     private TextView txvDelete;
+    private int nSelected = 0;
 
     ArrayList<PatientModel> patientModels = new ArrayList<>();
 
@@ -232,6 +233,11 @@ public class SavedExamActivity extends AppCompatActivity implements View.OnClick
         SavedExamAdapter.PatientHolder ph = (SavedExamAdapter.PatientHolder)v.getTag();
         ph.selected = !ph.selected;
         view.setBackgroundColor((ph.selected) ? Color.YELLOW : ph.background);
+        if (ph.selected)
+            nSelected++;
+        else
+            nSelected--;
+        txvDelete.setVisibility((nSelected > 0) ? View.VISIBLE : View.GONE);
         return true;
     }
 

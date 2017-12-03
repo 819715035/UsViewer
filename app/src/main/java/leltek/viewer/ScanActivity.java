@@ -225,7 +225,6 @@ public class ScanActivity extends AppCompatActivity
                     probe.startScan();
                     lytFreeze.setVisibility(View.GONE);
                     nestedScrollView.setVisibility(View.VISIBLE);
-                    rytLoops.setVisibility(View.GONE);
                 }
             }
         });
@@ -1058,7 +1057,7 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onScanStarted() {
         mToggleScan.setText(R.string.freeze);
-
+        rytLoops.setVisibility(View.GONE);
         ToastMgr.show("Scan Started");
     }
 
@@ -1066,7 +1065,7 @@ public class ScanActivity extends AppCompatActivity
     public void onScanStopped() {
         mToggleScan.setText(R.string.live);
         int frameIndex = probe.getCineBufferSize()-1;
-	seekBarLoops.setMax(frameIndex);
+	    seekBarLoops.setMax(frameIndex);
         seekBarLoops.setProgress(frameIndex);
         txvFrameNo.setText("frame# " + Integer.toString(frameIndex));
         rytLoops.setVisibility(View.VISIBLE);
