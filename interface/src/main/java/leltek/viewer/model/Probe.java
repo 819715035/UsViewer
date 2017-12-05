@@ -357,6 +357,13 @@ public interface Probe {
     void setPersistence(int persistence);
 
     /**
+     * 取得目前的image enhance level count
+     *
+     * @return image enhance level count
+     */
+    int getEnhanceLevelCount();
+
+    /**
      * 取得目前的image enhance level
      *
      * @return image enhance level

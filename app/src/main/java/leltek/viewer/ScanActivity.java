@@ -299,6 +299,7 @@ public class ScanActivity extends AppCompatActivity
 
         mSeekBarEnhancement = findViewById(R.id.seekBarEnhancement);
         mSeekBarEnhancement.setProgress(probe.getEnhanceLevel());
+        mSeekBarEnhancement.setMax(probe.getEnhanceLevelCount()-1);
         //probe.setEnhanceLevel(2);
         mSeekBarEnhancement.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
