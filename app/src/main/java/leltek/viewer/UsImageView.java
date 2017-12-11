@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import leltek.viewer.model.Probe;
 import leltek.viewer.model.SimuProbe;
@@ -86,6 +87,22 @@ public class UsImageView extends AppCompatImageView {
     //    private String unit = " cm";
     private String unit = " ";
     private int scaleWidth = 10;
+    private ImageListener imageListener = null;
+    private float[] imxValues = null;
+
+    interface ImageListener {
+        void onImageMatrixChanged();
+    }
+
+    public void setImageListener(ImageListener imageListener) {
+        this.imageListener = imageListener;
+    }
+
+    public float[] getUsImageMatrixValues() {
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        return values;
+    }
 
     public UsImageView(Context context) {
         super(context);
@@ -429,6 +446,17 @@ public class UsImageView extends AppCompatImageView {
             drawOutline(canvas);
         }
         drawRuler(canvas);
+
+        if (imageListener != null) {
+            float[] values = new float[9];
+            getImageMatrix().getValues(values);
+            if (imxValues == null)
+                imxValues = values;
+            if (!Arrays.equals(imxValues, values)) {
+                imageListener.onImageMatrixChanged();
+                imxValues = values;
+            }
+        }
     }
 
     public void cModeOnTouchEvent(MotionEvent event) {
@@ -1026,6 +1054,20 @@ public class UsImageView extends AppCompatImageView {
             if (startY > h)
                 break;
         }
+    }
+
+    public Matrix getUsImageMatrix() {
+        return getImageMatrix();
+    }
+
+    public void setUsImageMatrix(Matrix matrix) {
+        setImageMatrix(matrix);
+    }
+
+    public void fitHeight() {
+        fitWidth = false;
+        setImageMatrix(fitHeightMatrix);
+        initRoi();
     }
 
     private class Ball {

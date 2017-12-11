@@ -1,5 +1,6 @@
 package leltek.viewer.customview;
 
+import android.graphics.Matrix;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -14,6 +15,10 @@ public class MovableTouchListener implements View.OnTouchListener {
     private View mView;
     private int leftMargin;
     private int topMargin;
+    private float scaleX;
+    private float scaleY;
+    private float scrollX;
+    private float scrollY;
 
     MovableTouchListener(final View view, final MovableEditText.ICallback iCallback) {
         GestureDetector.OnGestureListener mGestureListener = new GestureDetector.SimpleOnGestureListener() {
@@ -34,6 +39,12 @@ public class MovableTouchListener implements View.OnTouchListener {
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) mView.getLayoutParams();
                 leftMargin = params.leftMargin;
                 topMargin = params.topMargin;
+                float[] values = iCallback.getUsImageMatrixValues();
+                scaleX = values[Matrix.MSCALE_X];
+                scaleY = values[Matrix.MSCALE_Y];
+                MovableEditText met = (MovableEditText)mView;
+                scrollX = met.scrollX;
+                scrollY = met.scrollY;
                 return true;
             }
 
@@ -43,6 +54,9 @@ public class MovableTouchListener implements View.OnTouchListener {
                 params.leftMargin = (int)(leftMargin + e2.getRawX() - mMotionDownX);
                 params.topMargin = (int)(topMargin + e2.getRawY() - mMotionDownY);
                 mView.requestLayout();
+                MovableEditText met = (MovableEditText)mView;
+                met.scrollX = scrollX + (e2.getRawX() - mMotionDownX)/scaleX;
+                met.scrollY = scrollY + (e2.getRawY() - mMotionDownY)/scaleY;
                 return true;
             }
 
