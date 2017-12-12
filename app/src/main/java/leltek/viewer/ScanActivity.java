@@ -139,10 +139,10 @@ public class ScanActivity extends AppCompatActivity
     private TextView txvSaveImage;
     private TextView txvMeasure;
     private NestedScrollView nestedScrollView;
-    private Handler mHandler = new Handler();
-    private View mView;
-    private PopupMenu mPopupMenu;
-    private Matrix mMatrix = null;
+    Handler mHandler = new Handler();
+    View mView;
+    PopupMenu mPopupMenu;
+    Matrix mMatrix = null;
 
     public static Intent newIntent(Context packageContext) {
         return new Intent(packageContext, ScanActivity.class);
@@ -233,12 +233,15 @@ public class ScanActivity extends AppCompatActivity
                     probe.stopScan();
                     lytFreeze.setVisibility(View.VISIBLE);
                     nestedScrollView.setVisibility(View.GONE);
+                    mImageView.scanOn = false;
                 } else {
                     annotateEditText.clear();
                     annotateContainer.removeAllViews();
+                    mImageView.stopMeasure();
                     probe.startScan();
                     lytFreeze.setVisibility(View.GONE);
                     nestedScrollView.setVisibility(View.VISIBLE);
+                    mImageView.scanOn = true;
                 }
             }
         });
@@ -943,9 +946,9 @@ public class ScanActivity extends AppCompatActivity
                             intent.putExtra(CheckPermission.KEY, AppConstant.PERMISSION_SAVE_IMAGE);
                             startActivityForResult(intent, AppConstant.RESULT_CALLBACK);
                         }
-                        mImageView.setUsImageMatrix(mMatrix);
+                        //mImageView.setUsImageMatrix(mMatrix);
                     }
-                }, 10);
+                }, 500);
             }
         });
     }
@@ -1217,13 +1220,13 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onTemperatureChanged(int newTemperature) {
         // update temperature displayed on UI
-        //ToastMgr.show("Temperature  is " + newTemperature + "簞C");
-        logger.debug("Temperature  is " + newTemperature + "簞C");
+        //ToastMgr.show("Temperature  is " + newTemperature + "蝪");
+        logger.debug("Temperature  is " + newTemperature);
     }
 
     @Override
     public void onTemperatureOverHeated(int temperature) {
-        ToastMgr.show("Temperature over heated, now is " + temperature + " 簞");
+        ToastMgr.show("Temperature over heated, now is " + temperature);
     }
 
     @Override
@@ -1337,21 +1340,12 @@ public class ScanActivity extends AppCompatActivity
     public void onPositionClick(int position) {
         switch (position) {
             case AppConstant.DISTANCE:
-                ArrayList<View> removedView = new ArrayList<>();
-                for (View view : annotateEditText) {
-                    if (view instanceof EllipseView) {
-                        removedView.add(view);
-                        annotateContainer.removeView(view);
-                    }
-                }
-                annotateEditText.removeAll(removedView);
-                MeasureView measureView = new MeasureView(this);
-                annotateEditText.add(measureView);
-                annotateContainer.addView(annotateEditText.get(annotateEditText.size() - 1));
+                mImageView.startMeasure();
                 break;
             case AppConstant.CLEAR_ALL:
                 annotateEditText.clear();
                 annotateContainer.removeAllViews();
+                mImageView.stopMeasure();
                 break;
             case AppConstant.ELLIPSE:
                 if (annotateEditText.size() > 0) {
@@ -1359,12 +1353,6 @@ public class ScanActivity extends AppCompatActivity
                         return;
                 }
                 ArrayList<View> removedView1 = new ArrayList<>();
-                for (View view : annotateEditText) {
-                    if (view instanceof MeasureView) {
-                        removedView1.add(view);
-                        annotateContainer.removeView(view);
-                    }
-                }
                 if (removedView1.size() > 0) {
                     annotateEditText.removeAll(removedView1);
                 }

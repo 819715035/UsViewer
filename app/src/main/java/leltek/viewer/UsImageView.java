@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import leltek.viewer.customview.MeasureView;
 import leltek.viewer.model.Probe;
 import leltek.viewer.model.SimuProbe;
 import leltek.viewer.model.SimuProbeLinear;
@@ -37,6 +38,7 @@ public class UsImageView extends AppCompatImageView {
     private static final int MOVE = 1;
     private static final int ZOOM = 2;
     private static final int DRAG = 3;
+    private static final int MEASURE = 4;
     private final static float sMaxScale = 4f;
     private final static float sMinScale = 1f;
     private final static float rdRatio = (float) (Math.PI / 180);
@@ -57,6 +59,7 @@ public class UsImageView extends AppCompatImageView {
     private Matrix fitHeightMatrix;
     private Matrix fitWidthMatrix;
     private boolean fitWidth;
+    private boolean initDone = false;
     private Paint paint = new Paint();
     private Canvas canvas = new Canvas();
     private ArrayList<Ball> balls = new ArrayList<>();
@@ -89,6 +92,10 @@ public class UsImageView extends AppCompatImageView {
     private int scaleWidth = 10;
     private ImageListener imageListener = null;
     private float[] imxValues = null;
+    private Context mContext = null;
+    public boolean scanOn = true;
+    private MeasureView measureView = new MeasureView();
+    private boolean measureOn = false;
 
     interface ImageListener {
         void onImageMatrixChanged();
@@ -153,6 +160,8 @@ public class UsImageView extends AppCompatImageView {
     }
 
     private void init(Context context) {
+        mContext = context;
+
         probe = ProbeSelection.simu ? (ProbeSelection.simuLinear ? SimuProbeLinear.getDefault() : SimuProbe.getDefault()) : WifiProbe.getDefault();
         int heightPx = probe.getImageHeightPx();
         int widthPx = probe.getImageWidthPx();
@@ -255,6 +264,10 @@ public class UsImageView extends AppCompatImageView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (!scanOn) {
+            bModeOnTouchEvent(event);
+            return true;
+        }
         if (probe.getMode() == Probe.EnumMode.MODE_B) {
             bModeOnTouchEvent(event);
         } else if (probe.getMode() == Probe.EnumMode.MODE_C) {
@@ -270,6 +283,14 @@ public class UsImageView extends AppCompatImageView {
         float[] values = new float[9];
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
+                mode = NONE;
+                if (measureOn) {
+                    getImageMatrix().getValues(values);
+                    if (measureView.onTouchEvent(event, values)) {
+                        mode = MEASURE;
+                        return;
+                    }
+                }
                 zoomMatrix.set(getImageMatrix());
                 savedZoomMatrix.set(zoomMatrix);
                 startPoint.set(event.getX(), event.getY());
@@ -285,6 +306,10 @@ public class UsImageView extends AppCompatImageView {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
+                if (mode == MEASURE) {
+                    mode = NONE;
+                    return;
+                }
                 mode = NONE;
                 zoomMatrix.getValues(values);
 
@@ -294,6 +319,14 @@ public class UsImageView extends AppCompatImageView {
 
                 break;
             case MotionEvent.ACTION_MOVE:
+                if (mode == MEASURE) {
+                    getImageMatrix().getValues(values);
+                    if (measureView.onTouchEvent(event, values)) {
+                        invalidate();
+                        return;
+                    }
+                }
+
                 if (mode == MOVE) {
                     zoomMatrix.set(savedZoomMatrix);
 
@@ -318,7 +351,6 @@ public class UsImageView extends AppCompatImageView {
                 }
                 break;
         }
-
         setImageMatrix(zoomMatrix);
     }
 
@@ -334,6 +366,11 @@ public class UsImageView extends AppCompatImageView {
             return;
 
         logger.debug("onWindowFocusChanged() called");
+
+        if (initDone)
+            return;
+
+        initDone = true;
 
         float viewWidth = (float) getWidth();
         float viewHeight = (float) getHeight();
@@ -367,6 +404,7 @@ public class UsImageView extends AppCompatImageView {
                 probe.getRPx());
 
         initRoi();
+        initMeasure();
     }
 
     private float distance(MotionEvent event) {
@@ -443,9 +481,11 @@ public class UsImageView extends AppCompatImageView {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (probe.getMode() == Probe.EnumMode.MODE_C) {
-            drawOutline(canvas);
+            if (scanOn)
+                drawOutline(canvas);
         }
         drawRuler(canvas);
+        drawMeasure(canvas);
 
         if (imageListener != null) {
             float[] values = new float[9];
@@ -1018,6 +1058,49 @@ public class UsImageView extends AppCompatImageView {
             startMovingArc = calArc(roiEndR, roiDiffTheta);
             moveConvexRoi(convexMidRoi.x, convexMidRoi.y);
         }
+    }
+
+    private void initMeasure() {
+        measureView.initViews(mContext);
+    }
+
+    public void startMeasure() {
+        if (measureOn)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        measureView.startMeasure(values);
+        measureOn = true;
+        invalidate();
+    }
+
+    public void stopMeasure() {
+        measureOn = false;
+        invalidate();
+    }
+
+    private void drawMeasure(Canvas canvas) {
+        if (!measureOn)
+            return;
+
+        int maxCm = (r == 0) ? 6 : 18;
+        float[] values = new float[9];
+        if (fitWidth) {
+            if (fitWidthMatrix == null)
+                return;
+            fitWidthMatrix.getValues(values);
+        } else {
+            if (fitHeightMatrix == null)
+                return;
+            fitHeightMatrix.getValues(values);
+        }
+        float fitScaleY = values[Matrix.MSCALE_Y];
+        getImageMatrix().getValues(values);
+        float realScaleY = values[Matrix.MSCALE_Y] / fitScaleY;
+        int h = canvas.getHeight();
+        double cmPerPx = maxCm/(h * realScaleY);
+
+        measureView.onDraw(canvas, values, cmPerPx);
     }
 
     private void drawRuler(Canvas canvas) {
