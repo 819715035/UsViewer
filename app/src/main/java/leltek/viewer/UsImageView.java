@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import leltek.viewer.customview.MeasureView;
+import leltek.viewer.customview.EllipseView;
 import leltek.viewer.model.Probe;
 import leltek.viewer.model.SimuProbe;
 import leltek.viewer.model.SimuProbeLinear;
@@ -39,6 +40,7 @@ public class UsImageView extends AppCompatImageView {
     private static final int ZOOM = 2;
     private static final int DRAG = 3;
     private static final int MEASURE = 4;
+    private static final int ELLIPSE = 5;
     private final static float sMaxScale = 4f;
     private final static float sMinScale = 1f;
     private final static float rdRatio = (float) (Math.PI / 180);
@@ -95,7 +97,9 @@ public class UsImageView extends AppCompatImageView {
     private Context mContext = null;
     public boolean scanOn = true;
     private MeasureView measureView = new MeasureView();
+    private EllipseView ellipseView = new EllipseView();
     private boolean measureOn = false;
+    private boolean ellipseOn = false;
 
     interface ImageListener {
         void onImageMatrixChanged();
@@ -291,6 +295,13 @@ public class UsImageView extends AppCompatImageView {
                         return;
                     }
                 }
+                if (ellipseOn) {
+                    getImageMatrix().getValues(values);
+                    if (ellipseView.onTouchEvent(event, values)) {
+                        mode = ELLIPSE;
+                        return;
+                    }
+                }
                 zoomMatrix.set(getImageMatrix());
                 savedZoomMatrix.set(zoomMatrix);
                 startPoint.set(event.getX(), event.getY());
@@ -306,7 +317,7 @@ public class UsImageView extends AppCompatImageView {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
-                if (mode == MEASURE) {
+                if (mode == MEASURE || mode == ELLIPSE) {
                     mode = NONE;
                     return;
                 }
@@ -322,6 +333,13 @@ public class UsImageView extends AppCompatImageView {
                 if (mode == MEASURE) {
                     getImageMatrix().getValues(values);
                     if (measureView.onTouchEvent(event, values)) {
+                        invalidate();
+                        return;
+                    }
+                }
+                if (mode == ELLIPSE) {
+                    getImageMatrix().getValues(values);
+                    if (ellipseView.onTouchEvent(event, values)) {
                         invalidate();
                         return;
                     }
@@ -405,6 +423,7 @@ public class UsImageView extends AppCompatImageView {
 
         initRoi();
         initMeasure();
+        initEllipse();
     }
 
     private float distance(MotionEvent event) {
@@ -486,6 +505,7 @@ public class UsImageView extends AppCompatImageView {
         }
         drawRuler(canvas);
         drawMeasure(canvas);
+        drawEllipse(canvas);
 
         if (imageListener != null) {
             float[] values = new float[9];
@@ -1079,28 +1099,64 @@ public class UsImageView extends AppCompatImageView {
         invalidate();
     }
 
-    private void drawMeasure(Canvas canvas) {
-        if (!measureOn)
-            return;
-
+    private double getCmPerPx(Canvas canvas) {
         int maxCm = (r == 0) ? 6 : 18;
         float[] values = new float[9];
         if (fitWidth) {
             if (fitWidthMatrix == null)
-                return;
+                return 0;
             fitWidthMatrix.getValues(values);
         } else {
             if (fitHeightMatrix == null)
-                return;
+                return 0;
             fitHeightMatrix.getValues(values);
         }
         float fitScaleY = values[Matrix.MSCALE_Y];
         getImageMatrix().getValues(values);
         float realScaleY = values[Matrix.MSCALE_Y] / fitScaleY;
         int h = canvas.getHeight();
-        double cmPerPx = maxCm/(h * realScaleY);
+        return maxCm/(h * realScaleY);
+    }
 
+    private void drawMeasure(Canvas canvas) {
+        if (!measureOn)
+            return;
+        double cmPerPx = getCmPerPx(canvas);
+        if (cmPerPx == 0)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
         measureView.onDraw(canvas, values, cmPerPx);
+    }
+
+    private void initEllipse() {
+        ellipseView.init(mContext);
+    }
+
+    public void startEllipse() {
+        if (ellipseOn)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        ellipseView.startEllipse(values);
+        ellipseOn = true;
+        invalidate();
+    }
+
+    public void stopEllipse() {
+        ellipseOn = false;
+        invalidate();
+    }
+
+    private void drawEllipse(Canvas canvas) {
+        if (!ellipseOn)
+            return;
+        double cmPerPx = getCmPerPx(canvas);
+        if (cmPerPx == 0)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        ellipseView.onDraw(canvas, values, cmPerPx);
     }
 
     private void drawRuler(Canvas canvas) {

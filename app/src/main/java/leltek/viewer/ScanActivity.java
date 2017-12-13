@@ -139,10 +139,10 @@ public class ScanActivity extends AppCompatActivity
     private TextView txvSaveImage;
     private TextView txvMeasure;
     private NestedScrollView nestedScrollView;
-    Handler mHandler = new Handler();
-    View mView;
-    PopupMenu mPopupMenu;
-    Matrix mMatrix = null;
+    private Handler mHandler = new Handler();
+    private View mView;
+    private PopupMenu mPopupMenu;
+    private Matrix mMatrix = null;
 
     public static Intent newIntent(Context packageContext) {
         return new Intent(packageContext, ScanActivity.class);
@@ -238,6 +238,7 @@ public class ScanActivity extends AppCompatActivity
                     annotateEditText.clear();
                     annotateContainer.removeAllViews();
                     mImageView.stopMeasure();
+                    mImageView.stopEllipse();
                     probe.startScan();
                     lytFreeze.setVisibility(View.GONE);
                     nestedScrollView.setVisibility(View.VISIBLE);
@@ -948,7 +949,7 @@ public class ScanActivity extends AppCompatActivity
                         }
                         //mImageView.setUsImageMatrix(mMatrix);
                     }
-                }, 500);
+                }, 100);
             }
         });
     }
@@ -1220,7 +1221,7 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onTemperatureChanged(int newTemperature) {
         // update temperature displayed on UI
-        //ToastMgr.show("Temperature  is " + newTemperature + "蝪");
+        //ToastMgr.show("Temperature  is " + newTemperature + "?軋酗");
         logger.debug("Temperature  is " + newTemperature);
     }
 
@@ -1346,19 +1347,10 @@ public class ScanActivity extends AppCompatActivity
                 annotateEditText.clear();
                 annotateContainer.removeAllViews();
                 mImageView.stopMeasure();
+                mImageView.stopEllipse();
                 break;
             case AppConstant.ELLIPSE:
-                if (annotateEditText.size() > 0) {
-                    if (annotateEditText.get(annotateEditText.size() - 1) instanceof EllipseView)
-                        return;
-                }
-                ArrayList<View> removedView1 = new ArrayList<>();
-                if (removedView1.size() > 0) {
-                    annotateEditText.removeAll(removedView1);
-                }
-                EllipseView ellipseView = new EllipseView(this);
-                annotateEditText.add(ellipseView);
-                annotateContainer.addView(annotateEditText.get(annotateEditText.size() - 1));
+                mImageView.startEllipse();
         }
     }
 }

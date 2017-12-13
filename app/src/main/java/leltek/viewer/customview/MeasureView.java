@@ -94,7 +94,7 @@ public class MeasureView {
         double yDifference = (double) (p2y - p1y);
         double distance = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2)) * cmPerPx;
         String value = String.format(Locale.ENGLISH, "%.2f", distance);
-        canvas.drawText("Distance " + value, 100, 50, textDraw);
+        canvas.drawText("Distance " + value, 70, 30, textDraw);
         canvas.drawLine(p1x + plusIcons.get(0).getWidthOfBall() / 2,
                 p1y + plusIcons.get(0).getWidthOfBall() / 2, p2x
                         + plusIcons.get(1).getWidthOfBall() / 2, p2y
@@ -112,6 +112,10 @@ public class MeasureView {
         float scaleX = values[Matrix.MSCALE_X];
         float tranY = values[Matrix.MTRANS_Y];
         float scaleY = values[Matrix.MSCALE_Y];
+
+        int X = (int) event.getX();
+        int Y = (int) event.getY();
+
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
                 balID = -1;
@@ -123,13 +127,13 @@ public class MeasureView {
                     float centerX = x + ball.getWidthOfBall();
                     float centerY = y + ball.getHeightOfBall();
                     // calculate the radius from the touch to the center of the ball
-                    double xDifference = centerX - event.getX();
-                    double yDifference = centerY - event.getY();
+                    double xDifference = centerX - X;
+                    double yDifference = centerY - Y;
                     double radCircle = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2));
                     if (radCircle < ball.getWidthOfBall()) {
                         balID = ball.getID();
-                        mMotionDownX = event.getX();
-                        mMotionDownY = event.getY();
+                        mMotionDownX = X;
+                        mMotionDownY = Y;
                         mScrollX = ball.getX();
                         mScrollY = ball.getY();
                         break;
@@ -139,8 +143,8 @@ public class MeasureView {
 
             case MotionEvent.ACTION_MOVE:
                 if (balID > -1) {
-                    float x = mScrollX + (event.getX() - mMotionDownX)/scaleX;
-                    float y = mScrollY + (event.getY() - mMotionDownY)/scaleY;
+                    float x = mScrollX + (X - mMotionDownX)/scaleX;
+                    float y = mScrollY + (Y - mMotionDownY)/scaleY;
                     plusIcons.get(balID).setX((int)x);
                     plusIcons.get(balID).setY((int)y);
                 }
