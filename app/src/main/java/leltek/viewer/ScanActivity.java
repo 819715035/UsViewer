@@ -6,6 +6,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.icu.text.SimpleDateFormat;
@@ -138,17 +139,10 @@ public class ScanActivity extends AppCompatActivity
     private TextView txvSaveImage;
     private TextView txvMeasure;
     private NestedScrollView nestedScrollView;
-
-
-    Handler mHandler = new Handler();
-    Runnable mRunnable = new Runnable(){
-        @Override
-        public void run() {
-            mView.requestLayout();
-        }
-    };
-    View mView;
-    PopupMenu mPopupMenu;
+    private Handler mHandler = new Handler();
+    private View mView;
+    private PopupMenu mPopupMenu;
+    private Matrix mMatrix = null;
 
     public static Intent newIntent(Context packageContext) {
         return new Intent(packageContext, ScanActivity.class);
@@ -202,6 +196,26 @@ public class ScanActivity extends AppCompatActivity
         ////////////////////////////////////////////////////////////////////////
         mImageView = findViewById(R.id.image_view);
 
+        mImageView.setImageListener(new UsImageView.ImageListener() {
+            @Override
+            public void onImageMatrixChanged() {
+                float[] values = mImageView.getUsImageMatrixValues();
+                float tranX = values[Matrix.MTRANS_X];
+                float scaleX = values[Matrix.MSCALE_X];
+                float tranY = values[Matrix.MTRANS_Y];
+                float scaleY = values[Matrix.MSCALE_Y];
+                for (View v : annotateEditText) {
+                    if (v instanceof MovableEditText) {
+                        MovableEditText met =  (MovableEditText)v;
+                        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) v.getLayoutParams();
+                        params.leftMargin = (int)(met.scrollX * scaleX + tranX);
+                        params.topMargin = (int)(met.scrollY * scaleY + tranY);
+                        v.requestLayout();
+                    }
+                }
+            }
+        });
+
         ////////////////////////////////////////////////////////////////////////
         // information and full screen button area on the right
         ////////////////////////////////////////////////////////////////////////
@@ -219,12 +233,16 @@ public class ScanActivity extends AppCompatActivity
                     probe.stopScan();
                     lytFreeze.setVisibility(View.VISIBLE);
                     nestedScrollView.setVisibility(View.GONE);
+                    mImageView.scanOn = false;
                 } else {
                     annotateEditText.clear();
                     annotateContainer.removeAllViews();
+                    mImageView.stopMeasure();
+                    mImageView.stopEllipse();
                     probe.startScan();
                     lytFreeze.setVisibility(View.GONE);
                     nestedScrollView.setVisibility(View.VISIBLE);
+                    mImageView.scanOn = true;
                 }
             }
         });
@@ -340,8 +358,8 @@ public class ScanActivity extends AppCompatActivity
 
             }
         });
-	mTextViewColorPrf.setVisibility(View.GONE);
-	mSpinnerColorPrf.setVisibility(View.GONE);
+        mTextViewColorPrf.setVisibility(View.GONE);
+        mSpinnerColorPrf.setVisibility(View.GONE);
 
         mTextViewColorSensitivity = findViewById(R.id.textViewColorSensitivity);
         mTextViewColorSensitivity.setVisibility(View.GONE);
@@ -394,8 +412,8 @@ public class ScanActivity extends AppCompatActivity
 
             }
         });
-	mTextViewColorAngle.setVisibility(View.GONE);
-	mSeekBarColorAngle.setVisibility(View.GONE);
+        mTextViewColorAngle.setVisibility(View.GONE);
+        mSeekBarColorAngle.setVisibility(View.GONE);
 
 
         mProgressBarBattery = findViewById(R.id.progressBarBattery);
@@ -827,8 +845,15 @@ public class ScanActivity extends AppCompatActivity
                 MovableEditText movableEditText = new MovableEditText(ScanActivity.this);
                 FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT);
+                float[] values = mImageView.getUsImageMatrixValues();
+                float tranX = values[Matrix.MTRANS_X];
+                float scaleX = values[Matrix.MSCALE_X];
+                float tranY = values[Matrix.MTRANS_Y];
+                float scaleY = values[Matrix.MSCALE_Y];
                 layoutParams.leftMargin = 100;
                 layoutParams.topMargin = 50;
+                movableEditText.scrollX = (layoutParams.leftMargin - tranX)/scaleX;
+                movableEditText.scrollY = (layoutParams.topMargin - tranY)/scaleY;
                 movableEditText.setLayoutParams(layoutParams);
                 movableEditText.setHint(getString(R.string.annotate));
                 movableEditText.initializeCallback(new MovableEditText.ICallback() {
@@ -865,7 +890,15 @@ public class ScanActivity extends AppCompatActivity
                         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                         imm.showSoftInput(view, 0);
                         mView = view;
-                        mHandler.postDelayed(mRunnable, 200);
+                        mHandler.postDelayed(new Runnable() {
+                            public void run() {
+                                mView.requestLayout();
+                            }
+                        }, 10);
+                    }
+                    @Override
+                    public float[] getUsImageMatrixValues() {
+                        return mImageView.getUsImageMatrixValues();
                     }
                 });
                 movableEditText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -896,21 +929,28 @@ public class ScanActivity extends AppCompatActivity
         txvSaveImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (CheckPermission.isPermissionGranted(ScanActivity.this,
-                        Manifest.permission.READ_EXTERNAL_STORAGE) && CheckPermission.isPermissionGranted(ScanActivity.this,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                    Utils.saveImage(capturedArea, ScanActivity.this);
-                    String newImage = PrefrenceData.getInstance().getNewImage();
-                    PatientInfo pi = new PatientInfo(getApplicationContext());
-                    long id =  CurrentPatientInfo.getPatientId();
-                    PatientModel pm = pi.getPatientInfo(id);
-                    pm.addImage(newImage);
-                    pi.updatePatientInfo(id, pm);
-                } else {
-                    Intent intent = new Intent(ScanActivity.this, CheckPermission.class);
-                    intent.putExtra(CheckPermission.KEY, AppConstant.PERMISSION_SAVE_IMAGE);
-                    startActivityForResult(intent, AppConstant.RESULT_CALLBACK);
-                }
+                mMatrix = new Matrix(mImageView.getUsImageMatrix());
+                mImageView.fitHeight();
+                mHandler.postDelayed(new Runnable() {
+                    public void run() {
+                        if (CheckPermission.isPermissionGranted(ScanActivity.this,
+                                Manifest.permission.READ_EXTERNAL_STORAGE) && CheckPermission.isPermissionGranted(ScanActivity.this,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                            Utils.saveImage(capturedArea, ScanActivity.this);
+                            String newImage = PrefrenceData.getInstance().getNewImage();
+                            PatientInfo pi = new PatientInfo(getApplicationContext());
+                            long id =  CurrentPatientInfo.getPatientId();
+                            PatientModel pm = pi.getPatientInfo(id);
+                            pm.addImage(newImage);
+                            pi.updatePatientInfo(id, pm);
+                        } else {
+                            Intent intent = new Intent(ScanActivity.this, CheckPermission.class);
+                            intent.putExtra(CheckPermission.KEY, AppConstant.PERMISSION_SAVE_IMAGE);
+                            startActivityForResult(intent, AppConstant.RESULT_CALLBACK);
+                        }
+                        //mImageView.setUsImageMatrix(mMatrix);
+                    }
+                }, 100);
             }
         });
     }
@@ -999,46 +1039,46 @@ public class ScanActivity extends AppCompatActivity
     public void onModeSwitched(Probe.EnumMode mode) {
         if (mode == Probe.EnumMode.MODE_B) {
             ToastMgr.show("switched to B mode");
-	    mTextViewTgcCmode.setVisibility(View.GONE);
-	    mTextViewTgcBmode.setVisibility(View.VISIBLE);
-	    mSeekBarTgcCmode.setVisibility(View.GONE);
-	    mSeekBarTgcBmode.setVisibility(View.VISIBLE);
-	    mTextViewColorPrf.setVisibility(View.GONE);
-	    mSpinnerColorPrf.setVisibility(View.GONE);
-	    mTextViewColorSensitivity.setVisibility(View.GONE);
-	    mSeekBarColorSensitivity.setVisibility(View.GONE);
-	    if(probe.getRPx() == 0 ) {
-		mTextViewColorAngle.setVisibility(View.GONE);
-		mSeekBarColorAngle.setVisibility(View.GONE);
-	    }
+            mTextViewTgcCmode.setVisibility(View.GONE);
+            mTextViewTgcBmode.setVisibility(View.VISIBLE);
+            mSeekBarTgcCmode.setVisibility(View.GONE);
+            mSeekBarTgcBmode.setVisibility(View.VISIBLE);
+            mTextViewColorPrf.setVisibility(View.GONE);
+            mSpinnerColorPrf.setVisibility(View.GONE);
+            mTextViewColorSensitivity.setVisibility(View.GONE);
+            mSeekBarColorSensitivity.setVisibility(View.GONE);
+            if(probe.getRPx() == 0 ) {
+                mTextViewColorAngle.setVisibility(View.GONE);
+                mSeekBarColorAngle.setVisibility(View.GONE);
+            }
         } else if (mode == Probe.EnumMode.MODE_C) {
             ToastMgr.show("switched to Color mode");
-	    mTextViewTgcBmode.setVisibility(View.GONE);
-	    mTextViewTgcCmode.setVisibility(View.VISIBLE);
-	    mSeekBarTgcBmode.setVisibility(View.GONE);
-	    mSeekBarTgcCmode.setVisibility(View.VISIBLE);
-	    mTextViewColorPrf.setVisibility(View.VISIBLE);
-	    mSpinnerColorPrf.setVisibility(View.VISIBLE);
-	    mTextViewColorSensitivity.setVisibility(View.VISIBLE);
-	    mSeekBarColorSensitivity.setVisibility(View.VISIBLE);
-	    if(probe.getRPx() == 0 ) {
-		mTextViewColorAngle.setVisibility(View.VISIBLE);
-		mSeekBarColorAngle.setVisibility(View.VISIBLE);
-	    }
+            mTextViewTgcBmode.setVisibility(View.GONE);
+            mTextViewTgcCmode.setVisibility(View.VISIBLE);
+            mSeekBarTgcBmode.setVisibility(View.GONE);
+            mSeekBarTgcCmode.setVisibility(View.VISIBLE);
+            mTextViewColorPrf.setVisibility(View.VISIBLE);
+            mSpinnerColorPrf.setVisibility(View.VISIBLE);
+            mTextViewColorSensitivity.setVisibility(View.VISIBLE);
+            mSeekBarColorSensitivity.setVisibility(View.VISIBLE);
+            if(probe.getRPx() == 0 ) {
+                mTextViewColorAngle.setVisibility(View.VISIBLE);
+                mSeekBarColorAngle.setVisibility(View.VISIBLE);
+            }
         } else if (mode == Probe.EnumMode.MODE_M) {
             ToastMgr.show("switched to M mode");
-	    mTextViewTgcCmode.setVisibility(View.GONE);
-	    mTextViewTgcBmode.setVisibility(View.VISIBLE);
-	    mSeekBarTgcCmode.setVisibility(View.GONE);
-	    mSeekBarTgcBmode.setVisibility(View.VISIBLE);
-	    mTextViewColorPrf.setVisibility(View.GONE);
-	    mSpinnerColorPrf.setVisibility(View.GONE);
-	    mTextViewColorSensitivity.setVisibility(View.GONE);
-	    mSeekBarColorSensitivity.setVisibility(View.GONE);
-	    if(probe.getRPx() == 0 ) {
-		mTextViewColorAngle.setVisibility(View.GONE);
-		mSeekBarColorAngle.setVisibility(View.GONE);
-	    }
+            mTextViewTgcCmode.setVisibility(View.GONE);
+            mTextViewTgcBmode.setVisibility(View.VISIBLE);
+            mSeekBarTgcCmode.setVisibility(View.GONE);
+            mSeekBarTgcBmode.setVisibility(View.VISIBLE);
+            mTextViewColorPrf.setVisibility(View.GONE);
+            mSpinnerColorPrf.setVisibility(View.GONE);
+            mTextViewColorSensitivity.setVisibility(View.GONE);
+            mSeekBarColorSensitivity.setVisibility(View.GONE);
+            if(probe.getRPx() == 0 ) {
+                mTextViewColorAngle.setVisibility(View.GONE);
+                mSeekBarColorAngle.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -1066,7 +1106,7 @@ public class ScanActivity extends AppCompatActivity
     public void onScanStopped() {
         mToggleScan.setText(R.string.live);
         int frameIndex = probe.getCineBufferSize()-1;
-	    seekBarLoops.setMax(frameIndex);
+        seekBarLoops.setMax(frameIndex);
         seekBarLoops.setProgress(frameIndex);
         txvFrameNo.setText("frame# " + Integer.toString(frameIndex));
         rytLoops.setVisibility(View.VISIBLE);
@@ -1182,13 +1222,13 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onTemperatureChanged(int newTemperature) {
         // update temperature displayed on UI
-        //ToastMgr.show("Temperature  is " + newTemperature + "簞C");
-        logger.debug("Temperature  is " + newTemperature + "簞C");
+        //ToastMgr.show("Temperature  is " + newTemperature + "?軋酗");
+        logger.debug("Temperature  is " + newTemperature);
     }
 
     @Override
     public void onTemperatureOverHeated(int temperature) {
-        ToastMgr.show("Temperature over heated, now is " + temperature + " 簞");
+        ToastMgr.show("Temperature over heated, now is " + temperature);
     }
 
     @Override
@@ -1302,40 +1342,16 @@ public class ScanActivity extends AppCompatActivity
     public void onPositionClick(int position) {
         switch (position) {
             case AppConstant.DISTANCE:
-                ArrayList<View> removedView = new ArrayList<>();
-                for (View view : annotateEditText) {
-                    if (view instanceof EllipseView) {
-                        removedView.add(view);
-                        annotateContainer.removeView(view);
-                    }
-                }
-                annotateEditText.removeAll(removedView);
-                MeasureView measureView = new MeasureView(this);
-                annotateEditText.add(measureView);
-                annotateContainer.addView(annotateEditText.get(annotateEditText.size() - 1));
+                mImageView.startMeasure();
                 break;
             case AppConstant.CLEAR_ALL:
                 annotateEditText.clear();
                 annotateContainer.removeAllViews();
+                mImageView.stopMeasure();
+                mImageView.stopEllipse();
                 break;
             case AppConstant.ELLIPSE:
-                if (annotateEditText.size() > 0) {
-                    if (annotateEditText.get(annotateEditText.size() - 1) instanceof EllipseView)
-                        return;
-                }
-                ArrayList<View> removedView1 = new ArrayList<>();
-                for (View view : annotateEditText) {
-                    if (view instanceof MeasureView) {
-                        removedView1.add(view);
-                        annotateContainer.removeView(view);
-                    }
-                }
-                if (removedView1.size() > 0) {
-                    annotateEditText.removeAll(removedView1);
-                }
-                EllipseView ellipseView = new EllipseView(this);
-                annotateEditText.add(ellipseView);
-                annotateContainer.addView(annotateEditText.get(annotateEditText.size() - 1));
+                mImageView.startEllipse();
         }
     }
 }

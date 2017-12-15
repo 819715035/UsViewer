@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.util.AttributeSet;
@@ -21,7 +22,7 @@ import leltek.viewer.R;
  * Created by rajesh on 1/10/17.
  */
 
-public class MeasureView extends View {
+public class MeasureView {
     Point point1;
     Point point2;
     Paint endPoints;
@@ -30,7 +31,6 @@ public class MeasureView extends View {
     /**
      * point1 and point 3 are of same group and same as point 2 and point4
      */
-    int groupId = -1;
     private ArrayList<PlusIcons> plusIcons = new ArrayList<>();
     // array that holds the balls
     private int balID = 0;
@@ -39,23 +39,10 @@ public class MeasureView extends View {
     Canvas canvas;
     DisplayMetrics displayMetrics;
 
-    public MeasureView(Context context) {
-        super(context);
-        initViews(context);
-    }
+    private float mMotionDownX, mMotionDownY;
+    private float mScrollX, mScrollY;
 
-    public MeasureView(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-        initViews(context);
-
-    }
-
-    public MeasureView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        initViews(context);
-    }
-
-    private void initViews(Context context) {
+    public void initViews(Context context) {
         textDraw = new Paint();
         textDraw.setColor(Color.WHITE);
         textDraw.setTextSize(25);
@@ -66,8 +53,6 @@ public class MeasureView extends View {
         paint.setColor(Color.WHITE);
         paint.setStrokeWidth(5);
         endPoints = new Paint();
-        setFocusable(true); // necessary for getting the touch events
-        canvas = new Canvas();
         // setting the start point for the balls
         point1 = new Point();
         point1.x = 50;
@@ -82,93 +67,93 @@ public class MeasureView extends View {
         plusIcons.add(new PlusIcons(context, R.drawable.ic_add_raster, point2));
     }
 
+    public void startMeasure(float[] values) {
+        float tranX = values[Matrix.MTRANS_X];
+        float scaleX = values[Matrix.MSCALE_X];
+        float tranY = values[Matrix.MTRANS_Y];
+        float scaleY = values[Matrix.MSCALE_Y];
+        point1.x = (int)((50 - tranX)/scaleX);
+        point1.y = (int)((150 - tranY)/scaleY);
+        point2.x = (int)((150 - tranX)/scaleX);
+        point2.y = (int)((150 - tranY)/scaleY);
+    }
+
     // the method that draws the balls
-    @Override
-    protected void onDraw(Canvas canvas) {
-        double xDifference = (double) (point2.x - point1.x);
-        double yDifference = (double) (point2.y - point1.y);
-        double distance = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2));
-        String value = String.format(Locale.ENGLISH, "%.2f", getRealCm(distance));
-        canvas.drawText("Distance " + value, 0, 80, textDraw);
-        canvas.drawLine(point1.x + plusIcons.get(0).getWidthOfBall() / 2,
-                point1.y + plusIcons.get(0).getWidthOfBall() / 2, point2.x
-                        + plusIcons.get(1).getWidthOfBall() / 2, point2.y
+    public void onDraw(Canvas canvas, float[] values, double cmPerPx) {
+        float tranX = values[Matrix.MTRANS_X];
+        float scaleX = values[Matrix.MSCALE_X];
+        float tranY = values[Matrix.MTRANS_Y];
+        float scaleY = values[Matrix.MSCALE_Y];
+
+        float p1x = point1.x * scaleX + tranX;
+        float p1y = point1.y * scaleY + tranY;
+        float p2x = point2.x * scaleX + tranX;
+        float p2y = point2.y * scaleY + tranY;
+
+        double xDifference = (double) (p2x - p1x);
+        double yDifference = (double) (p2y - p1y);
+        double distance = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2)) * cmPerPx;
+        String value = String.format(Locale.ENGLISH, "%.2f", distance);
+        canvas.drawText("Distance " + value, 70, 30, textDraw);
+        canvas.drawLine(p1x + plusIcons.get(0).getWidthOfBall() / 2,
+                p1y + plusIcons.get(0).getWidthOfBall() / 2, p2x
+                        + plusIcons.get(1).getWidthOfBall() / 2, p2y
                         + plusIcons.get(1).getWidthOfBall() / 2, paint);
         // draw the balls on the canvas
         for (PlusIcons ball : plusIcons) {
-            canvas.drawBitmap(ball.getBitmap(), ball.getX(), ball.getY(), endPoints);
+            float x = ball.getX() * scaleX + tranX;
+            float y = ball.getY() * scaleY + tranY;
+            canvas.drawBitmap(ball.getBitmap(), x, y, endPoints);
         }
     }
 
-    public double getRealCm(double pixels) {
-        float dpi = (float) displayMetrics.densityDpi;
-        double inches = pixels / dpi;
-        return inches * 2.54f; //inches to cm
-    }
-
-    // events when touching the screen
-    public boolean onTouchEvent(MotionEvent event) {
-        int eventaction = event.getAction();
+    public boolean onTouchEvent(MotionEvent event, float[] values) {
+        float tranX = values[Matrix.MTRANS_X];
+        float scaleX = values[Matrix.MSCALE_X];
+        float tranY = values[Matrix.MTRANS_Y];
+        float scaleY = values[Matrix.MSCALE_Y];
 
         int X = (int) event.getX();
         int Y = (int) event.getY();
 
-        switch (eventaction) {
-
-            case MotionEvent.ACTION_DOWN: // touch down so check if the finger is on
-                // a ball
+        switch (event.getAction() & MotionEvent.ACTION_MASK) {
+            case MotionEvent.ACTION_DOWN:
                 balID = -1;
-                groupId = -1;
                 for (PlusIcons ball : plusIcons) {
                     // check if inside the bounds of the ball (circle)
                     // get the center for the ball
-                    int centerX = ball.getX() + ball.getWidthOfBall();
-                    int centerY = ball.getY() + ball.getHeightOfBall();
+                    float x = ball.getX() * scaleX + tranX;
+                    float y = ball.getY() * scaleY + tranY;
+                    float centerX = x + ball.getWidthOfBall();
+                    float centerY = y + ball.getHeightOfBall();
                     // calculate the radius from the touch to the center of the ball
                     double xDifference = centerX - X;
                     double yDifference = centerY - Y;
                     double radCircle = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2));
-
                     if (radCircle < ball.getWidthOfBall()) {
-
                         balID = ball.getID();
-                        if (balID == 1) {
-                            groupId = 2;
-                            canvas.drawLine(point1.x, point1.y, point2.x, point2.y, paint);
-                        } else {
-                            groupId = 1;
-                        }
-                        invalidate();
+                        mMotionDownX = X;
+                        mMotionDownY = Y;
+                        mScrollX = ball.getX();
+                        mScrollY = ball.getY();
                         break;
                     }
-                    invalidate();
                 }
-
                 break;
 
-            case MotionEvent.ACTION_MOVE: // touch drag with the ball
-                // move the balls the same as the finger
+            case MotionEvent.ACTION_MOVE:
                 if (balID > -1) {
-                    plusIcons.get(balID).setX(X);
-                    plusIcons.get(balID).setY(Y);
-                    invalidate();
+                    float x = mScrollX + (X - mMotionDownX)/scaleX;
+                    float y = mScrollY + (Y - mMotionDownY)/scaleY;
+                    plusIcons.get(balID).setX((int)x);
+                    plusIcons.get(balID).setY((int)y);
                 }
-
-                break;
-
-            case MotionEvent.ACTION_UP:
-                // touch drop - just do things here after dropping
-
                 break;
         }
-        // redraw the canvas
-        invalidate();
-        return true;
-
+        return (balID != -1);
     }
 
-
-    public static class PlusIcons {
+    private static class PlusIcons {
 
         Bitmap bitmap;
         Context mContext;

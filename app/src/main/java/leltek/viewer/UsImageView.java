@@ -19,7 +19,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
+import leltek.viewer.customview.MeasureView;
+import leltek.viewer.customview.EllipseView;
 import leltek.viewer.model.Probe;
 import leltek.viewer.model.SimuProbe;
 import leltek.viewer.model.SimuProbeLinear;
@@ -36,6 +39,8 @@ public class UsImageView extends AppCompatImageView {
     private static final int MOVE = 1;
     private static final int ZOOM = 2;
     private static final int DRAG = 3;
+    private static final int MEASURE = 4;
+    private static final int ELLIPSE = 5;
     private final static float sMaxScale = 4f;
     private final static float sMinScale = 1f;
     private final static float rdRatio = (float) (Math.PI / 180);
@@ -56,6 +61,7 @@ public class UsImageView extends AppCompatImageView {
     private Matrix fitHeightMatrix;
     private Matrix fitWidthMatrix;
     private boolean fitWidth;
+    private boolean initDone = false;
     private Paint paint = new Paint();
     private Canvas canvas = new Canvas();
     private ArrayList<Ball> balls = new ArrayList<>();
@@ -86,6 +92,28 @@ public class UsImageView extends AppCompatImageView {
     //    private String unit = " cm";
     private String unit = " ";
     private int scaleWidth = 10;
+    private ImageListener imageListener = null;
+    private float[] imxValues = null;
+    private Context mContext = null;
+    public boolean scanOn = true;
+    private MeasureView measureView = new MeasureView();
+    private EllipseView ellipseView = new EllipseView();
+    private boolean measureOn = false;
+    private boolean ellipseOn = false;
+
+    interface ImageListener {
+        void onImageMatrixChanged();
+    }
+
+    public void setImageListener(ImageListener imageListener) {
+        this.imageListener = imageListener;
+    }
+
+    public float[] getUsImageMatrixValues() {
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        return values;
+    }
 
     public UsImageView(Context context) {
         super(context);
@@ -136,6 +164,8 @@ public class UsImageView extends AppCompatImageView {
     }
 
     private void init(Context context) {
+        mContext = context;
+
         probe = ProbeSelection.simu ? (ProbeSelection.simuLinear ? SimuProbeLinear.getDefault() : SimuProbe.getDefault()) : WifiProbe.getDefault();
         int heightPx = probe.getImageHeightPx();
         int widthPx = probe.getImageWidthPx();
@@ -238,6 +268,10 @@ public class UsImageView extends AppCompatImageView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (!scanOn) {
+            bModeOnTouchEvent(event);
+            return true;
+        }
         if (probe.getMode() == Probe.EnumMode.MODE_B) {
             bModeOnTouchEvent(event);
         } else if (probe.getMode() == Probe.EnumMode.MODE_C) {
@@ -253,6 +287,21 @@ public class UsImageView extends AppCompatImageView {
         float[] values = new float[9];
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
+                mode = NONE;
+                if (measureOn) {
+                    getImageMatrix().getValues(values);
+                    if (measureView.onTouchEvent(event, values)) {
+                        mode = MEASURE;
+                        return;
+                    }
+                }
+                if (ellipseOn) {
+                    getImageMatrix().getValues(values);
+                    if (ellipseView.onTouchEvent(event, values)) {
+                        mode = ELLIPSE;
+                        return;
+                    }
+                }
                 zoomMatrix.set(getImageMatrix());
                 savedZoomMatrix.set(zoomMatrix);
                 startPoint.set(event.getX(), event.getY());
@@ -268,6 +317,10 @@ public class UsImageView extends AppCompatImageView {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
+                if (mode == MEASURE || mode == ELLIPSE) {
+                    mode = NONE;
+                    return;
+                }
                 mode = NONE;
                 zoomMatrix.getValues(values);
 
@@ -277,6 +330,21 @@ public class UsImageView extends AppCompatImageView {
 
                 break;
             case MotionEvent.ACTION_MOVE:
+                if (mode == MEASURE) {
+                    getImageMatrix().getValues(values);
+                    if (measureView.onTouchEvent(event, values)) {
+                        invalidate();
+                        return;
+                    }
+                }
+                if (mode == ELLIPSE) {
+                    getImageMatrix().getValues(values);
+                    if (ellipseView.onTouchEvent(event, values)) {
+                        invalidate();
+                        return;
+                    }
+                }
+
                 if (mode == MOVE) {
                     zoomMatrix.set(savedZoomMatrix);
 
@@ -301,7 +369,6 @@ public class UsImageView extends AppCompatImageView {
                 }
                 break;
         }
-
         setImageMatrix(zoomMatrix);
     }
 
@@ -317,6 +384,11 @@ public class UsImageView extends AppCompatImageView {
             return;
 
         logger.debug("onWindowFocusChanged() called");
+
+        if (initDone)
+            return;
+
+        initDone = true;
 
         float viewWidth = (float) getWidth();
         float viewHeight = (float) getHeight();
@@ -350,6 +422,8 @@ public class UsImageView extends AppCompatImageView {
                 probe.getRPx());
 
         initRoi();
+        initMeasure();
+        initEllipse();
     }
 
     private float distance(MotionEvent event) {
@@ -426,9 +500,23 @@ public class UsImageView extends AppCompatImageView {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (probe.getMode() == Probe.EnumMode.MODE_C) {
-            drawOutline(canvas);
+            if (scanOn)
+                drawOutline(canvas);
         }
         drawRuler(canvas);
+        drawMeasure(canvas);
+        drawEllipse(canvas);
+
+        if (imageListener != null) {
+            float[] values = new float[9];
+            getImageMatrix().getValues(values);
+            if (imxValues == null)
+                imxValues = values;
+            if (!Arrays.equals(imxValues, values)) {
+                imageListener.onImageMatrixChanged();
+                imxValues = values;
+            }
+        }
     }
 
     public void cModeOnTouchEvent(MotionEvent event) {
@@ -992,6 +1080,85 @@ public class UsImageView extends AppCompatImageView {
         }
     }
 
+    private void initMeasure() {
+        measureView.initViews(mContext);
+    }
+
+    public void startMeasure() {
+        if (measureOn)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        measureView.startMeasure(values);
+        measureOn = true;
+        invalidate();
+    }
+
+    public void stopMeasure() {
+        measureOn = false;
+        invalidate();
+    }
+
+    private double getCmPerPx(Canvas canvas) {
+        int maxCm = (r == 0) ? 6 : 18;
+        float[] values = new float[9];
+        if (fitWidth) {
+            if (fitWidthMatrix == null)
+                return 0;
+            fitWidthMatrix.getValues(values);
+        } else {
+            if (fitHeightMatrix == null)
+                return 0;
+            fitHeightMatrix.getValues(values);
+        }
+        float fitScaleY = values[Matrix.MSCALE_Y];
+        getImageMatrix().getValues(values);
+        float realScaleY = values[Matrix.MSCALE_Y] / fitScaleY;
+        int h = canvas.getHeight();
+        return maxCm/(h * realScaleY);
+    }
+
+    private void drawMeasure(Canvas canvas) {
+        if (!measureOn)
+            return;
+        double cmPerPx = getCmPerPx(canvas);
+        if (cmPerPx == 0)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        measureView.onDraw(canvas, values, cmPerPx);
+    }
+
+    private void initEllipse() {
+        ellipseView.init(mContext);
+    }
+
+    public void startEllipse() {
+        if (ellipseOn)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        ellipseView.startEllipse(values);
+        ellipseOn = true;
+        invalidate();
+    }
+
+    public void stopEllipse() {
+        ellipseOn = false;
+        invalidate();
+    }
+
+    private void drawEllipse(Canvas canvas) {
+        if (!ellipseOn)
+            return;
+        double cmPerPx = getCmPerPx(canvas);
+        if (cmPerPx == 0)
+            return;
+        float[] values = new float[9];
+        getImageMatrix().getValues(values);
+        ellipseView.onDraw(canvas, values, cmPerPx);
+    }
+
     private void drawRuler(Canvas canvas) {
         int maxCm = (r == 0) ? 6 : 18;
         float[] values = new float[9];
@@ -1026,6 +1193,20 @@ public class UsImageView extends AppCompatImageView {
             if (startY > h)
                 break;
         }
+    }
+
+    public Matrix getUsImageMatrix() {
+        return getImageMatrix();
+    }
+
+    public void setUsImageMatrix(Matrix matrix) {
+        setImageMatrix(matrix);
+    }
+
+    public void fitHeight() {
+        fitWidth = false;
+        setImageMatrix(fitHeightMatrix);
+        initRoi();
     }
 
     private class Ball {

@@ -13,7 +13,8 @@ public class MovableEditText extends android.support.v7.widget.AppCompatEditText
 
 
     ICallback iCallback;
-
+    public float scrollX = 0;
+    public float scrollY = 0;
 
     public void initializeCallback(ICallback iCallback) {
         this.iCallback = iCallback;
@@ -24,6 +25,7 @@ public class MovableEditText extends android.support.v7.widget.AppCompatEditText
         void onLongPress(View view);
         void onBack(View view);
         void onSingleTap(View view);
+        float[] getUsImageMatrixValues();
     }
 
     public MovableEditText(Context context) {
