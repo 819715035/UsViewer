@@ -252,6 +252,7 @@ public class ScanActivity extends AppCompatActivity
             @Override
             public void onClick(View v) {
                 probe.switchToBMode();
+                mImageView.stopRoi();
             }
         });
 
@@ -260,6 +261,7 @@ public class ScanActivity extends AppCompatActivity
             @Override
             public void onClick(View v) {
                 probe.switchToCMode();
+                mImageView.startRoi();
             }
         });
 
@@ -268,6 +270,7 @@ public class ScanActivity extends AppCompatActivity
             @Override
             public void onClick(View v) {
                 probe.switchToMMode();
+                mImageView.stopRoi();
             }
         });
 
@@ -1028,6 +1031,7 @@ public class ScanActivity extends AppCompatActivity
             return;
         if (probe.getMode() != Probe.EnumMode.MODE_B) {
             probe.switchToBMode();
+            mImageView.stopRoi();
         }
         if (probe.getMode() == Probe.EnumMode.MODE_B && !probe.isLive()) {
             probe.startScan();
@@ -1221,7 +1225,7 @@ public class ScanActivity extends AppCompatActivity
     @Override
     public void onTemperatureChanged(int newTemperature) {
         // update temperature displayed on UI
-        //ToastMgr.show("Temperature  is " + newTemperature + "?軋酗");
+        //ToastMgr.show("Temperature  is " + newTemperature + "?頠?");
         logger.debug("Temperature  is " + newTemperature);
     }
 
